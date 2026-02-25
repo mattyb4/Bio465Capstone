@@ -1,6 +1,8 @@
 from Bio.PDB import MMCIFParser
 import numpy as np
 from pathlib import Path
+import re
+import csv
 
 parser = MMCIFParser(QUIET=True)
 SCRIPT_DIR = Path(__file__).parent
@@ -27,9 +29,6 @@ def compute_distance(coord1, coord2):
 
 #find mutations within cutoff distance of PTM site
 def find_nearby_mutations(chain, ptm_pos, mutation_positions, cutoff=10.0): #adjust cutoff as needed
-    """
-    Returns list of mutations within cutoff Å of PTM site.
-    """
     results = []
 
     ptm_coord = get_ca_coord(chain, ptm_pos)
@@ -54,15 +53,55 @@ def find_nearby_mutations(chain, ptm_pos, mutation_positions, cutoff=10.0): #adj
 
     return results
 
-def parse_mutation_pos(): # Placeholder for mutation position parsing logic
-    results = []
-    return results
+MUT_RE = re.compile(r"[A-Z](\d+)[A-Z*]")  # e.g., R482H, S2054L
 
-ptm_position = 298 #change to be position of PTM site of interest
-mutation_positions = list(range(1, 2000)) #change to be list of mutation positions of interest, currently set to all positions in typical protein length range for demonstration
+def parse_ptm_positions(uniprot):
+    tsv_path = PROJECT_ROOT / "data" / "PTM_Associated_By_PTM_PrevalenceFilteredFar.tsv"
+    positions = set()
 
-nearby = find_nearby_mutations(chain, ptm_position, mutation_positions)
+    with tsv_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        for row in reader:
+            if row.get("UniProt") == uniprot:
+                positions.add(int(row["ptm_pos"]))
 
-#final output of program
-for hit in nearby:
-    print(f"Mutation at {hit['mutation_pos']} is {hit['distance']:.2f} Å away")
+    return sorted(positions)
+
+def parse_mutation_positions(ptm_pos, uniprot=None): 
+    tsv_path = PROJECT_ROOT / "data" / "PTM_Associated_By_PTM_PrevalenceFilteredFar.tsv"
+    positions = set()
+
+    with tsv_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        for row in reader:
+            if int(row["ptm_pos"]) != int(ptm_pos):
+                continue
+            if uniprot and row.get("UniProt") != uniprot:
+                continue
+
+            fields = [row.get("near_mutation", ""), row.get("far_mutations_prevalence_filtered", "")]
+            for field in fields:
+                for token in field.split(","):
+                    match = MUT_RE.search(token.strip())
+                    if match:
+                        positions.add(int(match.group(1)))
+
+    return sorted(positions)
+
+
+target_uniprot = "P35222" #change to be UniProt ID of interest (must match UniProt column in TSV)
+ptm_positions = parse_ptm_positions(target_uniprot)
+
+if not ptm_positions:
+    raise ValueError(f"No PTM positions found in TSV for UniProt {target_uniprot}.")
+
+for ptm_position in ptm_positions:
+    mutation_positions = parse_mutation_positions(ptm_position, uniprot=target_uniprot)
+    nearby = find_nearby_mutations(chain, ptm_position, mutation_positions)
+
+    print(f"\nPTM position {ptm_position} ({target_uniprot}):")
+    if nearby:
+        for hit in nearby:
+            print(f"  Mutation at {hit['mutation_pos']} is {hit['distance']:.2f} Å away")
+    else:
+        print("  No nearby mutations found within cutoff distance.")
