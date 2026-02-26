@@ -8,7 +8,7 @@ from biotite.structure.io.pdbx import CIFFile, get_structure
 SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 MODELS_ROOT = PROJECT_ROOT / "cif_models"
-OUTPUT_PATH = PROJECT_ROOT / "data" / "nearby_mutations_db.tsv"
+OUTPUT_PATH = PROJECT_ROOT / "Output" / "nearby_mutations_db.tsv"
 PTM_TSV_PATH = PROJECT_ROOT / "data" / "PTM_Associated_By_PTM_PrevalenceFilteredFar.tsv"
 
 _PTM_ROWS = None
@@ -56,7 +56,6 @@ def find_nearby_mutations(chain, ptm_pos, mutation_positions, cutoff=10.0): #adj
             })
 
     return results
-
 MUT_RE = re.compile(r"[A-Z](\d+)[A-Z*]")  # e.g., R482H, S2054L
 
 def parse_ptm_positions(uniprot):
@@ -127,11 +126,14 @@ def format_mutations(hits):
     parts = [f"{hit['mutation_pos']}-{hit['distance']:.2f}" for hit in sorted(hits, key=lambda h: h["mutation_pos"])]
     return ", ".join(parts)
 
-
+#This is for debugging specific cases. Run with --uniprot P12345 to only process that UniProt ID.
+#Can probably be removed for final version
 parser = argparse.ArgumentParser(description="Scan AFDB models for nearby PTM mutations.")
 parser.add_argument("--uniprot", help="Limit processing to a single UniProt ID.")
 args = parser.parse_args()
 
+
+# Main processing loop: iterate over AlphaFold models, find nearby mutations for each PTM site, and write results to TSV.
 with OUTPUT_PATH.open("w", encoding="utf-8", newline="") as handle:
     writer = csv.writer(handle, delimiter="\t")
     writer.writerow([
