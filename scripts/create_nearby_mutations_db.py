@@ -3,7 +3,8 @@ from pathlib import Path
 import re
 import csv
 import argparse
-from biotite.structure.io.pdbx import CIFFile, get_structure
+from typing import Any
+from biotite.structure.io.pdbx import CIFFile, get_structure  # type: ignore[import-untyped]
 
 SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
@@ -11,7 +12,7 @@ MODELS_ROOT = PROJECT_ROOT / "cif_models"
 OUTPUT_PATH = PROJECT_ROOT / "Output" / "nearby_mutations_db.tsv"
 PTM_TSV_PATH = PROJECT_ROOT / "data" / "PTM_Associated_By_PTM_PrevalenceFilteredFar.tsv"
 
-_PTM_ROWS = None
+_PTM_ROWS: list[dict[str, Any]] | None = None
 
 
 def get_ptm_rows():
@@ -32,7 +33,7 @@ def compute_distance(coord1, coord2):
     return np.linalg.norm(coord1 - coord2)
 
 #find mutations within cutoff distance of PTM site
-def find_nearby_mutations(chain, ptm_pos, mutation_positions, cutoff=10.0): #adjust cutoff as needed
+def find_nearby_mutations(chain, ptm_pos, mutation_entries, cutoff=10.0): #adjust cutoff as needed
     results = []
 
     ptm_coord = get_ca_coord(chain, ptm_pos)
@@ -41,7 +42,7 @@ def find_nearby_mutations(chain, ptm_pos, mutation_positions, cutoff=10.0): #adj
         print(f"PTM residue {ptm_pos} not found in structure.")
         return results
 
-    for mut_pos in mutation_positions:
+    for mutation, mut_pos in mutation_entries:
         mut_coord = get_ca_coord(chain, mut_pos)
 
         if mut_coord is None:
@@ -51,13 +52,15 @@ def find_nearby_mutations(chain, ptm_pos, mutation_positions, cutoff=10.0): #adj
 
         if distance <= cutoff:
             results.append({
+                "mutation": mutation,
                 "mutation_pos": mut_pos,
                 "distance": distance
             })
 
     return results
-MUT_RE = re.compile(r"[A-Z](\d+)[A-Z*]")  # e.g., R482H, S2054L
 
+
+#extracts PTM position from input db
 def parse_ptm_positions(uniprot):
     positions = set()
 
@@ -75,8 +78,10 @@ def parse_gene_name(uniprot):
 
     return ""
 
+MUT_RE = re.compile(r"([A-Z])(\d+)([A-Z*])")  # e.g., R482H, S2054L
+#extracts mutation positions from input db and puts them into a list
 def parse_mutation_positions(ptm_pos, uniprot=None): 
-    positions = set()
+    mutation_entries = set()
 
     for row in get_ptm_rows():
         if int(row["ptm_pos"]) != int(ptm_pos):
@@ -89,9 +94,10 @@ def parse_mutation_positions(ptm_pos, uniprot=None):
             for token in field.split(","):
                 match = MUT_RE.search(token.strip())
                 if match:
-                    positions.add(int(match.group(1)))
+                    mutation = f"{match.group(1)}{match.group(2)}{match.group(3)}"
+                    mutation_entries.add((mutation, int(match.group(2))))
 
-    return sorted(positions)
+    return sorted(mutation_entries, key=lambda x: (x[1], x[0]))
 
 
 def find_model_file(uniprot_dir):
@@ -123,7 +129,7 @@ def load_first_chain(model_file):
 def format_mutations(hits):
     if not hits:
         return ""
-    parts = [f"{hit['mutation_pos']}-{hit['distance']:.2f}" for hit in sorted(hits, key=lambda h: h["mutation_pos"])]
+    parts = [f"{hit['mutation']}-{hit['distance']:.2f}Å" for hit in sorted(hits, key=lambda h: (h["mutation_pos"], h["mutation"]))]
     return ", ".join(parts)
 
 #This is for debugging specific cases. Run with --uniprot P12345 to only process that UniProt ID.
@@ -134,7 +140,7 @@ args = parser.parse_args()
 
 
 # Main processing loop: iterate over AlphaFold models, find nearby mutations for each PTM site, and write results to TSV.
-with OUTPUT_PATH.open("w", encoding="utf-8", newline="") as handle:
+with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
     writer = csv.writer(handle, delimiter="\t")
     writer.writerow([
         "UniProt",
