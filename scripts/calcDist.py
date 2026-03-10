@@ -1,10 +1,21 @@
 import pandas as pd
 import re
+from pathlib import Path
 
-input_file = "nearby_mutations_db (2).csv"
-output_file = "calcLinearDistances.tsv"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+input_file = PROJECT_ROOT / "Output" / "nearby_mutations_db.tsv"
+output_file = PROJECT_ROOT / "Output" / "ptm_linear_distances.tsv"
 
-df = pd.read_csv(input_file, encoding="latin1")
+def read_nearby_table(path: Path):
+    for encoding in ("utf-16", "utf-8-sig", "utf-8", "latin1"):
+        try:
+            return pd.read_csv(path, sep="\t", encoding=encoding)
+        except UnicodeError:
+            continue
+    return pd.read_csv(path, sep="\t")
+
+
+df = read_nearby_table(input_file)
 
 COL_PTM = "ptm_pos"
 COL_WITHIN = "mutations_within_5_positions"
