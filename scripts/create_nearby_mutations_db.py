@@ -10,7 +10,7 @@ SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 MODELS_ROOT = PROJECT_ROOT / "cif_models"
 OUTPUT_PATH = PROJECT_ROOT / "Output" / "nearby_mutations_db.tsv"
-PTM_TSV_PATH = PROJECT_ROOT / "data" / "PTM_Associated_By_PTM_PrevalenceFilteredFar.tsv"
+PTM_TSV_PATH = PROJECT_ROOT / "data" / "PTMD_TCGA_hotspots_by_protein.tsv"
 
 _PTM_ROWS: list[dict[str, Any]] | None = None
 
@@ -60,38 +60,46 @@ def find_nearby_mutations(chain, ptm_pos, mutation_entries, cutoff=10.0): #adjus
     return results
 
 
-#extracts PTM position from input db
-def parse_ptm_positions(uniprot):
-    positions = set()
+#extracts PTM positions/types from input db
+PTM_RE = re.compile(r"([A-Z])(\d+)")  # e.g., S557
+
+
+def parse_ptm_entries(uniprot):
+    entries = set()
 
     for row in get_ptm_rows():
-        if row.get("UniProt") == uniprot:
-            positions.add(int(row["ptm_pos"]))
+        if row.get("uniprot_id") != uniprot:
+            continue
+        field = row.get("ptms_on_protein", "")
+        for token in re.split(r"[;,]", field):
+            token = token.strip()
+            match = PTM_RE.search(token)
+            if match:
+                ptm_type = f"{match.group(1)}{match.group(2)}"
+                entries.add((ptm_type, int(match.group(2))))
 
-    return sorted(positions)
+    return sorted(entries, key=lambda x: x[1])
 
 
 def parse_gene_name(uniprot):
     for row in get_ptm_rows():
-        if row.get("UniProt") == uniprot:
+        if row.get("uniprot_id") == uniprot:
             return row.get("gene", "")
 
     return ""
 
-MUT_RE = re.compile(r"([A-Z])(\d+)([A-Z*])")  # e.g., R482H, S2054L
+MUT_RE = re.compile(r"([A-Z])(\d+)([A-Z*])")  # e.g., R482H
 #extracts mutation positions from input db and puts them into a list
-def parse_mutation_positions(ptm_pos, uniprot=None): 
+def parse_mutation_positions(uniprot=None):
     mutation_entries = set()
 
     for row in get_ptm_rows():
-        if int(row["ptm_pos"]) != int(ptm_pos):
-            continue
-        if uniprot and row.get("UniProt") != uniprot:
+        if uniprot and row.get("uniprot_id") != uniprot:
             continue
 
-        fields = [row.get("near_mutation", ""), row.get("far_mutations_prevalence_filtered", "")]
+        fields = [row.get("mutations_on_protein", "")]
         for field in fields:
-            for token in field.split(","):
+            for token in re.split(r"[;,]", field):
                 match = MUT_RE.search(token.strip())
                 if match:
                     mutation = f"{match.group(1)}{match.group(2)}{match.group(3)}"
@@ -145,6 +153,7 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
     writer.writerow([
         "UniProt",
         "gene",
+        "ptm_type",
         "ptm_pos",
         "mutations_within_5_positions",
         "mutation_count_within_5_positions",
@@ -160,8 +169,11 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
         if args.uniprot and uniprot != args.uniprot:
             continue
         gene = parse_gene_name(uniprot)
-        ptm_positions = parse_ptm_positions(uniprot)
-        if not ptm_positions:
+        ptm_entries = parse_ptm_entries(uniprot)
+        if not ptm_entries:
+            continue
+        mutation_entries = parse_mutation_positions(uniprot=uniprot)
+        if not mutation_entries:
             continue
 
         model_file = find_model_file(uniprot_dir)
@@ -173,12 +185,8 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
         if chain is None:
             continue
 
-        for ptm_position in ptm_positions:
-            mutation_positions = parse_mutation_positions(ptm_position, uniprot=uniprot)
-            if not mutation_positions:
-                continue
-
-            nearby = find_nearby_mutations(chain, ptm_position, mutation_positions)
+        for ptm_type, ptm_position in ptm_entries:
+            nearby = find_nearby_mutations(chain, ptm_position, mutation_entries)
             if not nearby:
                 continue
             within_5 = [hit for hit in nearby if abs(hit["mutation_pos"] - ptm_position) <= 5]
@@ -186,6 +194,7 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
             writer.writerow([
                 uniprot,
                 gene,
+                ptm_type,
                 ptm_position,
                 format_mutations(within_5),
                 len(within_5),
