@@ -5,6 +5,38 @@ import sys
 from pathlib import Path
 
 
+def check_dependencies() -> None:
+    """Check if all required packages are installed before running the pipeline."""
+    required_packages = {
+        "pandas": "getAlphafoldCifs.py, calcDist.py",
+        "requests": "getAlphafoldCifs.py", 
+        "numpy": "create_nearby_mutations_db.py",
+        "biotite": "create_nearby_mutations_db.py"
+    }
+    
+    missing_packages = []
+    
+    for package, used_in in required_packages.items():
+        try:
+            __import__(package)
+            print(f"✓ {package} - found")
+        except ImportError:
+            print(f"✗ {package} - MISSING (needed for {used_in})")
+            missing_packages.append(package)
+    
+    if missing_packages:
+        print(f"\nERROR: Missing {len(missing_packages)} required package(s):")
+        for pkg in missing_packages:
+            print(f"  - {pkg}")
+        
+        print(f"\nTo install missing packages, run:")
+        print(f"  pip install {' '.join(missing_packages)}")
+        print("\nExiting pipeline - please install missing dependencies first.")
+        sys.exit(1)
+    
+    print("\n✓ All dependencies are satisfied!\n")
+
+
 PROJECT_ROOT = Path(__file__).resolve().parent
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 INPUT_TSV = PROJECT_ROOT / "data" / "PTMD_TCGA_hotspots_by_protein.tsv"
@@ -21,6 +53,10 @@ def run_step(cmd: list[str]) -> None:
 
 
 def main() -> None:
+    print("=== Bio465 Capstone Pipeline ===")
+    print("Checking dependencies...")
+    check_dependencies()
+    
     python_exe = sys.executable
 
     step1 = [
