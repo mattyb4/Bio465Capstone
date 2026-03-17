@@ -8,7 +8,7 @@ from pathlib import Path
 def check_dependencies() -> None:
     """Check if all required packages are installed before running the pipeline."""
     required_packages = {
-        "pandas": "getAlphafoldCifs.py, calcDist.py",
+        "pandas": "getAlphafoldCifs.py",
         "requests": "getAlphafoldCifs.py", 
         "numpy": "create_nearby_mutations_db.py",
         "biotite": "create_nearby_mutations_db.py"
@@ -29,7 +29,7 @@ def check_dependencies() -> None:
         for pkg in missing_packages:
             print(f"  - {pkg}")
         
-        print(f"\nTo install missing packages, run:")
+        print("\nTo install missing packages, run:")
         print(f"  pip install {' '.join(missing_packages)}")
         print("\nExiting pipeline - please install missing dependencies first.")
         sys.exit(1)
@@ -77,16 +77,12 @@ def main() -> None:
     if RUN_ONLY_UNIPROT:
         step2.extend(["--uniprot", RUN_ONLY_UNIPROT])
 
-    step3 = [python_exe, str(SCRIPTS_DIR / "calcDist.py")]
-
     print("Running pipeline steps in order:")
     print("1) Download CIF models")
-    print("2) Build nearby_mutations_db.tsv")
-    print("3) Build ptm_linear_distances.tsv")
+    print("2) Build nearby_mutations_dbv2.0.tsv")
 
     run_step(step1)
     run_step(step2)
-    run_step(step3)
 
     print("\nPipeline complete.")
 
