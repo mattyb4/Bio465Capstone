@@ -9,7 +9,7 @@ from biotite.structure.io.pdbx import CIFFile, get_structure  # type: ignore[imp
 SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 MODELS_ROOT = PROJECT_ROOT / "cif_models"
-OUTPUT_PATH = PROJECT_ROOT / "Output" / "nearby_mutations_db.tsv"
+OUTPUT_PATH = PROJECT_ROOT / "Output" / "nearby_mutations_dbv2.0.tsv"
 PTM_TSV_PATH = PROJECT_ROOT / "data" / "PTMD_TCGA_hotspots_by_protein.tsv"
 
 _PTM_ROWS: list[dict[str, Any]] | None = None
@@ -154,7 +154,6 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
         "UniProt",
         "gene",
         "ptm_type",
-        "ptm_pos",
         "mutations_within_5_positions",
         "mutation_count_within_5_positions",
         "mutations_more_than_5_positions",
@@ -195,7 +194,6 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
                 uniprot,
                 gene,
                 ptm_type,
-                ptm_position,
                 format_mutations(within_5),
                 len(within_5),
                 format_mutations(beyond_5),
