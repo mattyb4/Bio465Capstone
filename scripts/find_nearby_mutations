@@ -14,9 +14,6 @@ model = structure[0]   # First (and only) model
 chain = list(model.get_chains())[0]  # AlphaFold usually has one chain
 
 def get_ca_coord(chain, residue_number):
-    """
-    Returns CA coordinates for a given residue number.
-    """
     for residue in chain:
         if residue.get_id()[1] == residue_number:
             if "CA" in residue:

@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-input_file = PROJECT_ROOT / "Output" / "nearby_mutations_db.tsv"
+input_file = PROJECT_ROOT / "Output" / "nearby_mutations_dbv2.0.tsv"
 output_file = PROJECT_ROOT / "Output" / "ptm_linear_distances.tsv"
 
 def read_nearby_table(path: Path):
