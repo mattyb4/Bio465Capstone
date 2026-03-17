@@ -1,4 +1,5 @@
 import re
+import requests
 import pandas as pd
 
 
@@ -83,10 +84,42 @@ def find_case_count_column(df):
     )
 
 
+def fetch_uniprot_gene_mapping(uniprot_ids, batch_size=100):
+    """Fetch UniProt accession -> primary gene symbol via the UniProt REST API."""
+    ids = list(set(uniprot_ids))
+    if not ids:
+        return pd.DataFrame(columns=["UniProt", "gene"])
+
+    rows = []
+    for i in range(0, len(ids), batch_size):
+        batch = ids[i : i + batch_size]
+        query = " OR ".join(f"accession:{uid}" for uid in batch)
+        url = "https://rest.uniprot.org/uniprotkb/search"
+        params = {"query": query, "fields": "accession,gene_names", "format": "tsv", "size": batch_size}
+
+        while url:
+            resp = requests.get(url, params=params)
+            resp.raise_for_status()
+            lines = resp.text.strip().split("\n")
+            for line in lines[1:]:
+                parts = line.split("\t")
+                if len(parts) >= 2:
+                    accession = parts[0].strip()
+                    primary_gene = parts[1].strip().split()[0] if parts[1].strip() else None
+                    if primary_gene:
+                        rows.append({"UniProt": accession, "gene": primary_gene})
+
+            link_header = resp.headers.get("Link", "")
+            match = re.search(r'<([^>]+)>; rel="next"', link_header)
+            url = match.group(1) if match else None
+            params = None
+
+    return pd.DataFrame(rows).drop_duplicates(subset=["UniProt"])
+
+
 def main():
-    ptmd_file = "../data/Total_4.tsv"
-    tcga_file = "../data/frequent-mutations.2026-03-05.tsv"
-    idmap_file = "../data/idmap.xlsx"
+    ptmd_file = "../data/PTMD_disease_associated_ptms.tsv"
+    tcga_file = "../data/TCGA_frequent_mutations.tsv"
 
     output_file = "../data/PTMD_TCGA_hotspots_by_protein.tsv"
 
@@ -95,7 +128,6 @@ def main():
     # -----------------------
     ptmd = pd.read_csv(ptmd_file, sep="\t")
     tcga = pd.read_csv(tcga_file, sep="\t")
-    idmap = pd.read_excel(idmap_file)
 
     # -----------------------
     # Filter PTMD disruptions
@@ -103,10 +135,10 @@ def main():
     ptmd = ptmd[ptmd["State"] == "N"].copy()
 
     # -----------------------
-    # Map UniProt -> gene
+    # Map UniProt -> gene via UniProt REST API
     # -----------------------
-    idmap = idmap[["query", "symbol"]].dropna().drop_duplicates()
-    idmap = idmap.rename(columns={"query": "UniProt", "symbol": "gene"})
+    uniprot_ids = ptmd["UniProt"].dropna().unique().tolist()
+    idmap = fetch_uniprot_gene_mapping(uniprot_ids)
 
     ptmd = ptmd.merge(idmap, on="UniProt", how="left")
 
