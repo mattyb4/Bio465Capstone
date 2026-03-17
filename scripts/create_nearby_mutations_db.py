@@ -151,6 +151,10 @@ def linear_distances(hits, ptm_pos):
 def unique_mutation_position_count(hits):
     return len({hit["mutation_pos"] for hit in hits})
 
+
+def mutation_at_ptm_site(hits, ptm_pos):
+    return "yes" if any(hit["mutation_pos"] == int(ptm_pos) for hit in hits) else "no"
+
 #This is for debugging specific cases. Run with --uniprot P12345 to only process that UniProt ID.
 #Can probably be removed for final version
 parser = argparse.ArgumentParser(description="Scan AFDB models for nearby PTM mutations.")
@@ -172,7 +176,8 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
         "mutations_more_than_5_positions",
         "mutation_count_more_than_5_positions",
         "unique_mutation_position_count_more_than_5_positions",
-        "morethan5_linear_distance"
+        "morethan5_linear_distance",
+        "Mutation at PTM Site?"
     ])
 
     for uniprot_dir in sorted(MODELS_ROOT.iterdir()):
@@ -217,6 +222,7 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
                 len(beyond_5),
                 unique_mutation_position_count(beyond_5),
                 linear_distances(beyond_5, ptm_position),
+                mutation_at_ptm_site(within_5, ptm_position),
             ])
 
 print(f"Wrote nearby mutation data to {OUTPUT_PATH}")
