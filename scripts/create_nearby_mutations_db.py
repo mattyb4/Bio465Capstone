@@ -140,6 +140,13 @@ def format_mutations(hits):
     parts = [f"{hit['mutation']}-{hit['distance']:.2f}Å" for hit in sorted(hits, key=lambda h: (h["mutation_pos"], h["mutation"]))]
     return ", ".join(parts)
 
+
+def linear_distances(hits, ptm_pos):
+    if not hits:
+        return ""
+    distances = [str(hit["mutation_pos"] - int(ptm_pos)) for hit in sorted(hits, key=lambda h: (h["mutation_pos"], h["mutation"]))]
+    return ",".join(distances)
+
 #This is for debugging specific cases. Run with --uniprot P12345 to only process that UniProt ID.
 #Can probably be removed for final version
 parser = argparse.ArgumentParser(description="Scan AFDB models for nearby PTM mutations.")
@@ -156,8 +163,10 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
         "ptm_type",
         "mutations_within_5_positions",
         "mutation_count_within_5_positions",
+        "within5_linear_distance",
         "mutations_more_than_5_positions",
         "mutation_count_more_than_5_positions",
+        "morethan5_linear_distance"
     ])
 
     for uniprot_dir in sorted(MODELS_ROOT.iterdir()):
@@ -196,8 +205,10 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
                 ptm_type,
                 format_mutations(within_5),
                 len(within_5),
+                linear_distances(within_5, ptm_position),
                 format_mutations(beyond_5),
                 len(beyond_5),
+                linear_distances(beyond_5, ptm_position),
             ])
 
 print(f"Wrote nearby mutation data to {OUTPUT_PATH}")
