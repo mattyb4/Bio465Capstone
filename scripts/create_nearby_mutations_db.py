@@ -147,6 +147,10 @@ def linear_distances(hits, ptm_pos):
     distances = [str(hit["mutation_pos"] - int(ptm_pos)) for hit in sorted(hits, key=lambda h: (h["mutation_pos"], h["mutation"]))]
     return ",".join(distances)
 
+
+def unique_mutation_position_count(hits):
+    return len({hit["mutation_pos"] for hit in hits})
+
 #This is for debugging specific cases. Run with --uniprot P12345 to only process that UniProt ID.
 #Can probably be removed for final version
 parser = argparse.ArgumentParser(description="Scan AFDB models for nearby PTM mutations.")
@@ -163,9 +167,11 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
         "ptm_type",
         "mutations_within_5_positions",
         "mutation_count_within_5_positions",
+        "unique_mutation_position_count_within_5_positions",
         "within5_linear_distance",
         "mutations_more_than_5_positions",
         "mutation_count_more_than_5_positions",
+        "unique_mutation_position_count_more_than_5_positions",
         "morethan5_linear_distance"
     ])
 
@@ -205,9 +211,11 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
                 ptm_type,
                 format_mutations(within_5),
                 len(within_5),
+                unique_mutation_position_count(within_5),
                 linear_distances(within_5, ptm_position),
                 format_mutations(beyond_5),
                 len(beyond_5),
+                unique_mutation_position_count(beyond_5),
                 linear_distances(beyond_5, ptm_position),
             ])
 
