@@ -9,7 +9,7 @@ from biotite.structure.io.pdbx import CIFFile, get_structure  # type: ignore[imp
 SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 MODELS_ROOT = PROJECT_ROOT / "cif_models"
-OUTPUT_PATH = PROJECT_ROOT / "Output" / "nearby_mutations_db.tsv"
+OUTPUT_PATH = PROJECT_ROOT / "Output" / "nearby_mutations_dbv2.0.tsv"
 PTM_TSV_PATH = PROJECT_ROOT / "data" / "PTMD_TCGA_hotspots_by_protein.tsv"
 
 _PTM_ROWS: list[dict[str, Any]] | None = None
@@ -140,6 +140,21 @@ def format_mutations(hits):
     parts = [f"{hit['mutation']}-{hit['distance']:.2f}Å" for hit in sorted(hits, key=lambda h: (h["mutation_pos"], h["mutation"]))]
     return ", ".join(parts)
 
+
+def linear_distances(hits, ptm_pos):
+    if not hits:
+        return ""
+    distances = [str(hit["mutation_pos"] - int(ptm_pos)) for hit in sorted(hits, key=lambda h: (h["mutation_pos"], h["mutation"]))]
+    return ",".join(distances)
+
+
+def unique_mutation_position_count(hits):
+    return len({hit["mutation_pos"] for hit in hits})
+
+
+def mutation_at_ptm_site(hits, ptm_pos):
+    return "yes" if any(hit["mutation_pos"] == int(ptm_pos) for hit in hits) else "no"
+
 #This is for debugging specific cases. Run with --uniprot P12345 to only process that UniProt ID.
 #Can probably be removed for final version
 parser = argparse.ArgumentParser(description="Scan AFDB models for nearby PTM mutations.")
@@ -154,11 +169,15 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
         "UniProt",
         "gene",
         "ptm_type",
-        "ptm_pos",
         "mutations_within_5_positions",
         "mutation_count_within_5_positions",
+        "unique_mutation_position_count_within_5_positions",
+        "within5_linear_distance",
         "mutations_more_than_5_positions",
         "mutation_count_more_than_5_positions",
+        "unique_mutation_position_count_more_than_5_positions",
+        "morethan5_linear_distance",
+        "Mutation at PTM Site?"
     ])
 
     for uniprot_dir in sorted(MODELS_ROOT.iterdir()):
@@ -195,11 +214,15 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
                 uniprot,
                 gene,
                 ptm_type,
-                ptm_position,
                 format_mutations(within_5),
                 len(within_5),
+                unique_mutation_position_count(within_5),
+                linear_distances(within_5, ptm_position),
                 format_mutations(beyond_5),
                 len(beyond_5),
+                unique_mutation_position_count(beyond_5),
+                linear_distances(beyond_5, ptm_position),
+                mutation_at_ptm_site(within_5, ptm_position),
             ])
 
 print(f"Wrote nearby mutation data to {OUTPUT_PATH}")
