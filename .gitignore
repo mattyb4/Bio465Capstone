@@ -1,5 +1,6 @@
 # AlphaFold / structure model files
 *.cif
+*.json
 download_report.tsv
 
 # Python

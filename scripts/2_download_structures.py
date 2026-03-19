@@ -56,9 +56,8 @@ def pick_urls(record: dict, prefer: str = "cif") -> dict[str, str]:
             ((".cif.gz", ".cif"), 200),
             ((".bcif.gz", ".bcif"), 100),
         ])
-    pae_url = pick_by_priority([
+    pae_url = record.get("paeDocUrl", "") or pick_by_priority([
         ((".pae.json.gz", ".pae.json"), 300),
-        ((".json.gz", ".json"), 100),
     ])
     return {"structure_url": structure_url, "pae_url": pae_url}
 
@@ -149,11 +148,10 @@ def main(in_path: str, id_column: str, out_dir: str, prefer: str, also_pae: bool
 
                 if also_pae and urls.get("pae_url"):
                     pae_url = urls["pae_url"]
-                    if "pae" in pae_url.lower():
-                        pae_name = pae_url.split("/")[-1]
-                        pae_path = out_base / acc / pae_name
-                        download(pae_url, pae_path, s)
-                        row["pae_file"] = str(pae_path)
+                    pae_name = pae_url.split("/")[-1]
+                    pae_path = out_base / acc / pae_name
+                    download(pae_url, pae_path, s)
+                    row["pae_file"] = str(pae_path)
 
                 report_rows.append(row)
                 print(f"[{i}/{len(accs)}] {acc}: ok -> {struct_path.name}")

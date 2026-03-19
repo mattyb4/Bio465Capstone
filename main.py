@@ -8,7 +8,7 @@ from pathlib import Path
 def check_dependencies() -> None:
     """Check if all required packages are installed before running the pipeline."""
     required_packages = {
-        "pandas": "getAlphafoldCifs.py, calcDist.py",
+        "pandas": "getAlphafoldCifs.py, 1_filter.py",
         "requests": "getAlphafoldCifs.py", 
         "numpy": "create_nearby_mutations_db.py",
         "biotite": "create_nearby_mutations_db.py"
@@ -39,7 +39,7 @@ def check_dependencies() -> None:
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
-INPUT_TSV = PROJECT_ROOT / "data" / "PTMD_TCGA_hotspots_by_protein.tsv"
+INPUT_TSV = PROJECT_ROOT / "data" / "steps" / "PTMD_TCGA_hotspots_by_protein.tsv"
 MODELS_DIR = PROJECT_ROOT / "cif_models"
 
 
@@ -59,9 +59,11 @@ def main() -> None:
     
     python_exe = sys.executable
 
-    step1 = [
+    step1 = [python_exe, str(SCRIPTS_DIR / "1_filter.py")]
+
+    step2 = [
         python_exe,
-        str(SCRIPTS_DIR / "getAlphafoldCifs.py"),
+        str(SCRIPTS_DIR / "2_download_structures.py"),
         str(INPUT_TSV),
         "--id_column",
         "uniprot_id",
@@ -71,18 +73,17 @@ def main() -> None:
         "cif",
         "--delay",
         "0.1",
+        "--also_pae",
     ]
 
-    step2 = [python_exe, str(SCRIPTS_DIR / "create_nearby_mutations_db.py")]
+    step3 = [python_exe, str(SCRIPTS_DIR / "3_find_nearby_mutations.py")]
     if RUN_ONLY_UNIPROT:
-        step2.extend(["--uniprot", RUN_ONLY_UNIPROT])
-
-    step3 = [python_exe, str(SCRIPTS_DIR / "calcDist.py")]
+        step3.extend(["--uniprot", RUN_ONLY_UNIPROT])
 
     print("Running pipeline steps in order:")
-    print("1) Download CIF models")
-    print("2) Build nearby_mutations_db.tsv")
-    print("3) Build ptm_linear_distances.tsv")
+    print("1) Filter and merge PTMD + TCGA data")
+    print("2) Download AlphaFold CIF models and PAE files")
+    print("3) Find nearby mutations and compute distances")
 
     run_step(step1)
     run_step(step2)

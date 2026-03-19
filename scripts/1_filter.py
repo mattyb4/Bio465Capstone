@@ -1,6 +1,10 @@
 import re
 import requests
 import pandas as pd
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).parent
+PROJECT_ROOT = SCRIPT_DIR.parent
 
 
 def clean_str_list(values):
@@ -57,7 +61,10 @@ def build_ptm_site(row):
         except Exception:
             position = str(row["Position"]).strip()
 
-    return f"{residue}{position}".strip()
+    site = f"{residue}{position}".strip()
+    ptm_type = str(row["Type"]).strip() if pd.notna(row["Type"]) else ""
+
+    return f"{site}:{ptm_type}" if ptm_type else site
 
 
 def format_mutation_with_count(row):
@@ -86,11 +93,13 @@ def find_case_count_column(df):
 
 def fetch_uniprot_gene_mapping(uniprot_ids, batch_size=100):
     """Fetch UniProt accession -> primary gene symbol via the UniProt REST API."""
-    ids = list(set(uniprot_ids))
+    # Strip variant suffixes (e.g. Q16613_VAR_A129T -> Q16613) — AlphaFold models canonical sequences
+    ids = list({uid.split("_")[0] for uid in set(uniprot_ids)})
     if not ids:
         return pd.DataFrame(columns=["UniProt", "gene"])
 
     rows = []
+    uniprot_release = None
     for i in range(0, len(ids), batch_size):
         batch = ids[i : i + batch_size]
         query = " OR ".join(f"accession:{uid}" for uid in batch)
@@ -100,6 +109,8 @@ def fetch_uniprot_gene_mapping(uniprot_ids, batch_size=100):
         while url:
             resp = requests.get(url, params=params)
             resp.raise_for_status()
+            if uniprot_release is None:
+                uniprot_release = resp.headers.get("X-UniProt-Release")
             lines = resp.text.strip().split("\n")
             for line in lines[1:]:
                 parts = line.split("\t")
@@ -114,14 +125,15 @@ def fetch_uniprot_gene_mapping(uniprot_ids, batch_size=100):
             url = match.group(1) if match else None
             params = None
 
+    if uniprot_release:
+        print(f"Using UniProt release: {uniprot_release}")
     return pd.DataFrame(rows).drop_duplicates(subset=["UniProt"])
 
 
 def main():
-    ptmd_file = "../data/PTMD_disease_associated_ptms.tsv"
-    tcga_file = "../data/TCGA_frequent_mutations.tsv"
-
-    output_file = "../data/PTMD_TCGA_hotspots_by_protein.tsv"
+    ptmd_file = PROJECT_ROOT / "data" / "PTMD_disease_associated_ptms.tsv"
+    tcga_file = PROJECT_ROOT / "data" / "TCGA_frequent_mutations.tsv"
+    output_file = PROJECT_ROOT / "data" / "steps" / "PTMD_TCGA_hotspots_by_protein.tsv"
 
     # -----------------------
     # Load files
@@ -133,6 +145,9 @@ def main():
     # Filter PTMD disruptions
     # -----------------------
     ptmd = ptmd[ptmd["State"] == "N"].copy()
+
+    # Normalize variant UniProt IDs to canonical accession (e.g. Q16613_VAR_A129T -> Q16613)
+    ptmd["UniProt"] = ptmd["UniProt"].str.split("_").str[0]
 
     # -----------------------
     # Map UniProt -> gene via UniProt REST API
@@ -181,7 +196,7 @@ def main():
     ptmd_grouped = (
         ptmd.groupby("gene", as_index=False)
         .agg(
-            uniprot_id=("UniProt", clean_str_list),
+            uniprot_id=("UniProt", "first"),
             ptms_on_protein=("ptm_site", clean_str_list),
             ptm_disease_pairs=("ptm_disease_pair", clean_str_list),
         )
