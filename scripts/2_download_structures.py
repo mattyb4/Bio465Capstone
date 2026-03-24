@@ -129,33 +129,47 @@ def main(in_path: str, id_column: str, out_dir: str, prefer: str, also_pae: bool
                     print(f"[{i}/{len(accs)}] {acc}: no entry")
                     continue
 
-                record = meta[0] if isinstance(meta, list) and meta else meta
-                urls = pick_urls(record, prefer=prefer)
+                records = meta if isinstance(meta, list) else [meta]
+                # Keep only canonical records (uniprotAccession == acc, no isoform dash-suffix).
+                # Isoform records have uniprotAccession like "P11362-9" and model different sequences.
+                canonical_records = [r for r in records if r.get("uniprotAccession") == acc]
+                if not canonical_records:
+                    row["status"] = "NO_CANONICAL_MODEL"
+                    row["note"] = f"No canonical AFDB model; {len(records)} isoform-only record(s)"
+                    report_rows.append(row)
+                    print(f"[{i}/{len(accs)}] {acc}: no canonical model (isoforms only)")
+                    continue
+                records = canonical_records
+                downloaded = 0
+                for record in records:
+                    urls = pick_urls(record, prefer=prefer)
+                    if not urls.get("structure_url"):
+                        continue
+                    struct_url = urls["structure_url"]
+                    struct_name = struct_url.split("/")[-1]
+                    struct_path = out_base / acc / struct_name
+                    download(struct_url, struct_path, s)
+                    row["structure_file"] = str(struct_path)
+                    downloaded += 1
+                    if also_pae and urls.get("pae_url"):
+                        pae_url = urls["pae_url"]
+                        pae_name = pae_url.split("/")[-1]
+                        pae_path = out_base / acc / pae_name
+                        download(pae_url, pae_path, s)
+                        row["pae_file"] = str(pae_path)
+                    time.sleep(delay)
 
-                if not urls.get("structure_url"):
+                if not downloaded:
                     row["status"] = "NO_STRUCTURE_URL"
-                    row["note"] = f"No structure URL found; keys={list(record.keys())[:12]}..."
+                    row["note"] = f"No structure URL in any of {len(records)} record(s)"
                     report_rows.append(row)
                     print(f"[{i}/{len(accs)}] {acc}: no structure url")
                     continue
 
-                struct_url = urls["structure_url"]
-                struct_name = struct_url.split("/")[-1]
-                struct_path = out_base / acc / struct_name
-                download(struct_url, struct_path, s)
-                row["structure_file"] = str(struct_path)
                 row["status"] = "DOWNLOADED"
-
-                if also_pae and urls.get("pae_url"):
-                    pae_url = urls["pae_url"]
-                    pae_name = pae_url.split("/")[-1]
-                    pae_path = out_base / acc / pae_name
-                    download(pae_url, pae_path, s)
-                    row["pae_file"] = str(pae_path)
-
+                row["note"] = f"{downloaded} fragment(s)"
                 report_rows.append(row)
-                print(f"[{i}/{len(accs)}] {acc}: ok -> {struct_path.name}")
-                time.sleep(delay)
+                print(f"[{i}/{len(accs)}] {acc}: ok -> {downloaded} fragment(s)")
 
             except Exception as e:
                 row["status"] = "ERROR"

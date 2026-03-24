@@ -10,7 +10,8 @@ from biotite.structure.io.pdbx import CIFFile, get_structure  # type: ignore[imp
 SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 MODELS_ROOT = PROJECT_ROOT / "cif_models"
-OUTPUT_PATH = PROJECT_ROOT / "Output" / "ptm_mutation_proximity.tsv"
+OUTPUT_PATH = PROJECT_ROOT / "Output" / "ptm_mutation_proximity_db.tsv"
+SKIPPED_PATH = PROJECT_ROOT / "Output" / "ptm_skipped.tsv"
 PTM_TSV_PATH = PROJECT_ROOT / "data" / "steps" / "PTMD_TCGA_hotspots_by_protein.tsv"
 
 _PTM_ROWS: list[dict[str, Any]] | None = None
@@ -40,7 +41,6 @@ def find_nearby_mutations(chain, ptm_pos, mutation_entries, pae_matrix=None, cut
     ptm_coord = get_ca_coord(chain, ptm_pos)
 
     if ptm_coord is None:
-        print(f"PTM residue {ptm_pos} not found in structure.")
         return results
 
     for mutation, mut_pos in mutation_entries:
@@ -125,12 +125,18 @@ def parse_mutation_positions(uniprot=None):
 
 
 def find_model_file(uniprot_dir):
-    candidates = sorted(uniprot_dir.glob("*.cif"))
+    uid = uniprot_dir.name
+    # Only match canonical files: AF-{acc}-F{N}-model_v{ver}.cif
+    # Isoform files look like AF-{acc}-{M}-F1-model_v{ver}.cif and are excluded.
+    canonical_re = re.compile(rf"^AF-{re.escape(uid)}-F\d+-model_v\d+\.", re.IGNORECASE)
+    candidates = [p for p in sorted(uniprot_dir.glob("*.cif")) if canonical_re.match(p.name)]
     return candidates[0] if candidates else None
 
 
 def load_pae_matrix(uniprot_dir):
-    candidates = sorted(uniprot_dir.glob("*.json"))
+    uid = uniprot_dir.name
+    canonical_re = re.compile(rf"^AF-{re.escape(uid)}-F\d+-predicted_aligned_error_v\d+\.", re.IGNORECASE)
+    candidates = [p for p in sorted(uniprot_dir.glob("*.json")) if canonical_re.match(p.name)]
     if not candidates:
         return None
     with candidates[0].open() as f:
@@ -184,6 +190,9 @@ def linear_distances(hits, ptm_pos):
 def unique_mutation_position_count(hits):
     return len({hit["mutation_pos"] for hit in hits})
 
+def mutation_at_ptm_site(hits, ptm_pos):
+    return 'yes' if any(hit['mutation_pos'] == int(ptm_pos) for hit in hits) else 'no'
+
 
 def parse_ptm_diseases(uniprot, ptm_site, ptm_type):
     # ptm_disease_pairs format: "S516:Phosphorylation | Bladder cancer; K43:Ubiquitination | Lung adenocarcinoma"
@@ -208,16 +217,37 @@ def parse_ptm_diseases(uniprot, ptm_site, ptm_type):
                         diseases.append(disease)
     return "; ".join(diseases)
 
+AA3TO1 = {
+    "ALA":"A","ARG":"R","ASN":"N","ASP":"D","CYS":"C","GLN":"Q","GLU":"E",
+    "GLY":"G","HIS":"H","ILE":"I","LEU":"L","LYS":"K","MET":"M","PHE":"F",
+    "PRO":"P","SER":"S","THR":"T","TRP":"W","TYR":"Y","VAL":"V","SEC":"U","PYL":"O",
+}
+
 #This is for debugging specific cases. Run with --uniprot P12345 to only process that UniProt ID.
-#Can probably be removed for final version
 parser = argparse.ArgumentParser(description="Scan AFDB models for nearby PTM mutations.")
 parser.add_argument("--uniprot", help="Limit processing to a single UniProt ID.")
 args = parser.parse_args()
 
+SKIP_HEADER = ["UniProt", "gene", "ptm_site", "ptm_type", "skip_reason", "detail"]
 
-# Main processing loop: iterate over AlphaFold models, find nearby mutations for each PTM site, and write results to TSV.
-with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
+def write_skips(skip_writer, uniprot, gene, ptm_entries, reason, detail):
+    for ptm_site, _, ptm_type in ptm_entries:
+        skip_writer.writerow([uniprot, gene, ptm_site, ptm_type, reason, detail])
+
+def write_skip(skip_writer, uniprot, gene, ptm_site, ptm_type, reason, detail):
+    skip_writer.writerow([uniprot, gene, ptm_site, ptm_type, reason, detail])
+
+
+# Collect all UniProt IDs in the PTM TSV to catch proteins with no directory at all
+all_ptm_uniprots = {row["uniprot_id"] for row in get_ptm_rows() if row.get("uniprot_id")}
+dirs_present = {d.name for d in MODELS_ROOT.iterdir() if d.is_dir()}
+
+with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle, \
+     SKIPPED_PATH.open("w", encoding="utf-16", newline="") as skip_handle:
+
     writer = csv.writer(handle, delimiter="\t")
+    skip_writer = csv.writer(skip_handle, delimiter="\t")
+
     writer.writerow([
         "UniProt",
         "gene",
@@ -231,8 +261,19 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
         "mutation_count_more_than_5_positions",
         "unique_mutation_position_count_more_than_5_positions",
         "morethan5_linear_distance",
-        "ptm_diseases"
+        "mutation_at_ptm_site",
+        "ptm_diseases",
     ])
+    skip_writer.writerow(SKIP_HEADER)
+
+    # Proteins in PTM TSV with no downloaded directory at all (NO_ENTRY from AFDB)
+    for uniprot in sorted(all_ptm_uniprots - dirs_present):
+        if args.uniprot and uniprot != args.uniprot:
+            continue
+        gene = parse_gene_name(uniprot)
+        ptm_entries = parse_ptm_entries(uniprot)
+        write_skips(skip_writer, uniprot, gene, ptm_entries, "no_afdb_directory",
+                    "protein not found in AlphaFold DB (no download directory)")
 
     for uniprot_dir in sorted(MODELS_ROOT.iterdir()):
         if not uniprot_dir.is_dir():
@@ -251,16 +292,38 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
 
         model_file = find_model_file(uniprot_dir)
         if model_file is None:
-            print(f"Skipping {uniprot}: no CIF file found.")
+            write_skips(skip_writer, uniprot, gene, ptm_entries, "no_canonical_cif",
+                        "AFDB has only isoform models, no canonical sequence model")
+            print(f"Skipping {uniprot}: no canonical CIF file found.")
             continue
 
         chain = load_first_chain(model_file)
         if chain is None:
             continue
 
+        # Build residue -> 1-letter AA map for mismatch checking
+        pos_to_aa: dict[int, str] = {}
+        for atom in chain:
+            if atom.res_id not in pos_to_aa:
+                pos_to_aa[atom.res_id] = AA3TO1.get(atom.res_name, "?")
+
         pae_matrix = load_pae_matrix(uniprot_dir)
 
         for ptm_site, ptm_position, ptm_type in ptm_entries:
+            if ptm_position not in pos_to_aa:
+                write_skip(skip_writer, uniprot, gene, ptm_site, ptm_type,
+                           "position_not_in_structure",
+                           f"position {ptm_position} beyond canonical sequence length {max(pos_to_aa) if pos_to_aa else '?'}")
+                continue
+
+            struct_aa = pos_to_aa[ptm_position]
+            ptm_aa = ptm_site[0]
+            if struct_aa != ptm_aa:
+                write_skip(skip_writer, uniprot, gene, ptm_site, ptm_type,
+                           "residue_mismatch",
+                           f"PTMD={ptm_aa}{ptm_position} but canonical structure has {struct_aa}{ptm_position}")
+                continue
+
             nearby = find_nearby_mutations(chain, ptm_position, mutation_entries, pae_matrix=pae_matrix)
             if not nearby:
                 continue
@@ -279,7 +342,9 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle:
                 len(beyond_5),
                 unique_mutation_position_count(beyond_5),
                 linear_distances(beyond_5, ptm_position),
+                mutation_at_ptm_site(within_5, ptm_position),
                 parse_ptm_diseases(uniprot, ptm_site, ptm_type),
             ])
 
 print(f"Wrote nearby mutation data to {OUTPUT_PATH}")
+print(f"Wrote skipped PTMs to {SKIPPED_PATH}")
