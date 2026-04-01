@@ -1,8 +1,8 @@
-# AlphaFold / structure model files
+# AlphaFold structure models (large binary files, re-downloadable via step 2)
+cif_models/
 *.cif
 *.json
 download_report.tsv
-
 # Python
 __pycache__/
 *.py[cod]

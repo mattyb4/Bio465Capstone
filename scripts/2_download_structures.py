@@ -103,7 +103,12 @@ def read_table(path: str) -> pd.DataFrame:
     return pd.read_csv(p, sep="\t")
 
 
-def main(in_path: str, id_column: str, out_dir: str, prefer: str, also_pae: bool, delay: float) -> None:
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+DEFAULT_LOGS_DIR = PROJECT_ROOT / "Output" / "logs"
+
+
+def main(in_path: str, id_column: str, out_dir: str, prefer: str, also_pae: bool, delay: float, logs_dir: Path) -> None:
     df = read_table(in_path)
     if id_column not in df.columns:
         raise ValueError(f"Column '{id_column}' not found. Columns: {list(df.columns)}")
@@ -113,6 +118,7 @@ def main(in_path: str, id_column: str, out_dir: str, prefer: str, also_pae: bool
 
     out_base = Path(out_dir)
     out_base.mkdir(parents=True, exist_ok=True)
+    logs_dir.mkdir(parents=True, exist_ok=True)
 
     report_rows = []
 
@@ -167,9 +173,9 @@ def main(in_path: str, id_column: str, out_dir: str, prefer: str, also_pae: bool
                     continue
 
                 row["status"] = "DOWNLOADED"
-                row["note"] = f"{downloaded} fragment(s)"
+                row["note"] = struct_name
                 report_rows.append(row)
-                print(f"[{i}/{len(accs)}] {acc}: ok -> {downloaded} fragment(s)")
+                print(f"[{i}/{len(accs)}] {acc}: ok -> {struct_name}")
 
             except Exception as e:
                 row["status"] = "ERROR"
@@ -178,9 +184,17 @@ def main(in_path: str, id_column: str, out_dir: str, prefer: str, also_pae: bool
                 print(f"[{i}/{len(accs)}] {acc}: ERROR {e}")
 
     rep = pd.DataFrame(report_rows)
-    rep_path = out_base / "download_report.tsv"
+    rep_path = logs_dir / "download_report.tsv"
     rep.to_csv(rep_path, sep="\t", index=False)
     print(f"\nWrote report: {rep_path}")
+
+    error_rows = rep[rep["status"] != "DOWNLOADED"]
+    if not error_rows.empty:
+        err_path = logs_dir / "download_errors.tsv"
+        error_rows.to_csv(err_path, sep="\t", index=False)
+        print(f"Wrote error log ({len(error_rows)} failed): {err_path}")
+    else:
+        print("No errors — all accessions downloaded successfully.")
 
 
 if __name__ == "__main__":
@@ -191,6 +205,7 @@ if __name__ == "__main__":
     ap.add_argument("--prefer", choices=["cif", "pdb"], default="cif", help="Prefer mmCIF or PDB when both available")
     ap.add_argument("--also_pae", action="store_true", help="Also download PAE json when url contains 'pae'")
     ap.add_argument("--delay", type=float, default=0.1, help="Polite delay between requests (seconds)")
+    ap.add_argument("--logs_dir", default=str(DEFAULT_LOGS_DIR), help="Directory for download_report.tsv and download_errors.tsv")
     args = ap.parse_args()
 
-    main(args.in_path, args.id_column, args.out_dir, args.prefer, args.also_pae, args.delay)
+    main(args.in_path, args.id_column, args.out_dir, args.prefer, args.also_pae, args.delay, Path(args.logs_dir))

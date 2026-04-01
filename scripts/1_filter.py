@@ -138,7 +138,7 @@ def main():
     # -----------------------
     # Load files
     # -----------------------
-    ptmd = pd.read_csv(ptmd_file, sep="\t")
+    ptmd = pd.read_csv(ptmd_file, sep="\t", low_memory=False)
     tcga = pd.read_csv(tcga_file, sep="\t")
 
     # -----------------------
@@ -237,13 +237,10 @@ def main():
 
     print("Done.")
     print(f"Using case count column: {case_count_col}")
-    print(f"PTMD genes kept: {ptmd['gene'].nunique()}")
-    print(f"TCGA hotspot genes kept: {tcga['gene'].nunique()}")
-    print(f"Proteins with PTMs and mutation hotspots: {len(merged)}")
+    print(f"PTMD disruption genes: {ptmd['gene'].nunique()}")
+    print(f"TCGA hotspot genes: {tcga['gene'].nunique()}")
+    print(f"Final merged proteins: {len(merged)}")
     print(f"Output saved to: {output_file}")
-    print("PTMD disruption genes:", ptmd["gene"].nunique())
-    print("TCGA hotspot genes:", tcga["gene"].nunique())
-    print("Final merged proteins:", len(merged))
 
 
 if __name__ == "__main__":

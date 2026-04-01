@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 
@@ -15,47 +16,96 @@ MODELS_DIR = PROJECT_ROOT / "cif_models"
 RUN_ONLY_UNIPROT: str | None = None
 
 
-def run_step(cmd: list[str]) -> None:
-    print("\n$", " ".join(cmd))
-    subprocess.run(cmd, check=True)
+STEPS = [
+    "Filter and merge PTMD + TCGA data",
+    "Download AlphaFold CIF models and PAE files",
+    "Find nearby mutations and compute distances",
+    "Merge HTP/LTP scores into proximity database",
+]
+
+
+def _bar(char: str = "─", width: int = 60) -> str:
+    return char * width
+
+
+def run_step(label: str, step_num: int, total: int, cmd: list[str]) -> float:
+    print()
+    print(_bar("─"))
+    print(f"  Step {step_num}/{total}: {label}")
+    print(f"  Command: {' '.join(cmd)}")
+    print(_bar("─"))
+    t0 = time.time()
+    result = subprocess.run(cmd)
+    elapsed = time.time() - t0
+    print(_bar("─"))
+    if result.returncode == 0:
+        print(f"  ✓  Step {step_num} finished in {elapsed:.1f}s")
+    else:
+        print(f"  ✗  Step {step_num} FAILED (exit code {result.returncode}) after {elapsed:.1f}s")
+        print(_bar("═"))
+        sys.exit(result.returncode)
+    print(_bar("─"))
+    return elapsed
 
 
 def main() -> None:
-    print("=== Bio465 Capstone Pipeline ===")
+    print()
+    print(_bar("═"))
+    print("       Bio465 Capstone Pipeline")
+    print(_bar("═"))
+    print(f"  Project root : {PROJECT_ROOT}")
+    print(f"  Input TSV    : {INPUT_TSV}")
+    print(f"  Models dir   : {MODELS_DIR}")
+    if RUN_ONLY_UNIPROT:
+        print(f"  Limiting step 3 to UniProt: {RUN_ONLY_UNIPROT}")
+    print()
+    print("  Steps to run:")
+    for i, label in enumerate(STEPS, 1):
+        print(f"    {i}. {label}")
+    print(_bar("═"))
+
     python_exe = sys.executable
 
-    step1 = [python_exe, str(SCRIPTS_DIR / "1_filter.py")]
+    step1_cmd = [python_exe, str(SCRIPTS_DIR / "1_filter.py")]
 
-    step2 = [
+    step2_cmd = [
         python_exe,
         str(SCRIPTS_DIR / "2_download_structures.py"),
         str(INPUT_TSV),
-        "--id_column",
-        "uniprot_id",
-        "--out_dir",
-        str(MODELS_DIR),
-        "--prefer",
-        "cif",
-        "--delay",
-        "0.1",
+        "--id_column", "uniprot_id",
+        "--out_dir", str(MODELS_DIR),
+        "--prefer", "cif",
+        "--delay", "0.1",
         "--also_pae",
+        "--logs_dir", str(PROJECT_ROOT / "Output" / "logs"),
     ]
 
-    step3 = [python_exe, str(SCRIPTS_DIR / "3_find_nearby_mutations.py")]
+    step3_cmd = [python_exe, str(SCRIPTS_DIR / "3_find_nearby_mutations.py")]
     if RUN_ONLY_UNIPROT:
-        step3.extend(["--uniprot", RUN_ONLY_UNIPROT])
+        step3_cmd.extend(["--uniprot", RUN_ONLY_UNIPROT])
 
-    print("Running pipeline steps in order:")
-    print("1) Filter and merge PTMD + TCGA data")
-    print("2) Download AlphaFold CIF models and PAE files")
-    print("3) Find nearby mutations and compute distances")
+    step4_cmd = [python_exe, str(SCRIPTS_DIR / "4_merge_htp_ltp.py")]
 
-    run_step(step1)
-    run_step(step2)
-    run_step(step3)
+    pipeline_start = time.time()
 
-    print("\nPipeline complete.")
+    t1 = run_step(STEPS[0], 1, len(STEPS), step1_cmd)
+    t2 = run_step(STEPS[1], 2, len(STEPS), step2_cmd)
+    t3 = run_step(STEPS[2], 3, len(STEPS), step3_cmd)
+    t4 = run_step(STEPS[3], 4, len(STEPS), step4_cmd)
+
+    total = time.time() - pipeline_start
+    print()
+    print(_bar("═"))
+    print("  Pipeline complete!")
+    print()
+    print(f"  Step 1 ({STEPS[0]}): {t1:.1f}s")
+    print(f"  Step 2 ({STEPS[1]}): {t2:.1f}s")
+    print(f"  Step 3 ({STEPS[2]}): {t3:.1f}s")
+    print(f"  Step 4 ({STEPS[3]}): {t4:.1f}s")
+    print(f"  Total elapsed: {total:.1f}s")
+    print(_bar("═"))
+    print()
 
 
 if __name__ == "__main__":
-	main()
+    main()

@@ -11,7 +11,7 @@ SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 MODELS_ROOT = PROJECT_ROOT / "cif_models"
 OUTPUT_PATH = PROJECT_ROOT / "Output" / "ptm_mutation_proximity_db.tsv"
-SKIPPED_PATH = PROJECT_ROOT / "Output" / "ptm_skipped.tsv"
+SKIPPED_PATH = PROJECT_ROOT / "Output" / "logs" / "ptm_skipped.tsv"
 PTM_TSV_PATH = PROJECT_ROOT / "data" / "steps" / "PTMD_TCGA_hotspots_by_protein.tsv"
 
 _PTM_ROWS: list[dict[str, Any]] | None = None
@@ -183,7 +183,13 @@ def format_mutations(hits):
 def linear_distances(hits, ptm_pos):
     if not hits:
         return ""
-    distances = sorted({abs(hit["mutation_pos"] - int(ptm_pos)) for hit in hits})
+    seen = set()
+    distances = []
+    for hit in sorted(hits, key=lambda h: (h["mutation_pos"], h["mutation"])):
+        pos = hit["mutation_pos"]
+        if pos not in seen:
+            seen.add(pos)
+            distances.append(abs(pos - int(ptm_pos)))
     return ",".join(str(d) for d in distances)
 
 
@@ -223,7 +229,7 @@ AA3TO1 = {
     "PRO":"P","SER":"S","THR":"T","TRP":"W","TYR":"Y","VAL":"V","SEC":"U","PYL":"O",
 }
 
-#This is for debugging specific cases. Run with --uniprot P12345 to only process that UniProt ID.
+# Optional: limit processing to a single UniProt ID (e.g. --uniprot O00571).
 parser = argparse.ArgumentParser(description="Scan AFDB models for nearby PTM mutations.")
 parser.add_argument("--uniprot", help="Limit processing to a single UniProt ID.")
 args = parser.parse_args()
