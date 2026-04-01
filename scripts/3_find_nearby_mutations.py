@@ -5,6 +5,7 @@ import csv
 import json
 import argparse
 from typing import Any
+from tqdm import tqdm
 from biotite.structure.io.pdbx import CIFFile, get_structure  # type: ignore[import-untyped]
 
 SCRIPT_DIR = Path(__file__).parent
@@ -12,6 +13,9 @@ PROJECT_ROOT = SCRIPT_DIR.parent
 MODELS_ROOT = PROJECT_ROOT / "cif_models"
 OUTPUT_PATH = PROJECT_ROOT / "Output" / "ptm_mutation_proximity_db.tsv"
 SKIPPED_PATH = PROJECT_ROOT / "Output" / "logs" / "ptm_skipped.tsv"
+
+OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+SKIPPED_PATH.parent.mkdir(parents=True, exist_ok=True)
 PTM_TSV_PATH = PROJECT_ROOT / "data" / "steps" / "PTMD_TCGA_hotspots_by_protein.tsv"
 
 _PTM_ROWS: list[dict[str, Any]] | None = None
@@ -152,16 +156,16 @@ def load_first_chain(model_file):
         cif = CIFFile.read(str(model_file))
         structure = get_structure(cif, model=1)
     except Exception as exc:
-        print(f"Skipping {model_file.name}: failed to parse ({exc}).")
+        tqdm.write(f"  Skipping {model_file.name}: failed to parse ({exc})")
         return None
 
     if structure is None or len(structure) == 0:
-        print(f"Skipping {model_file.name}: no models found.")
+        tqdm.write(f"  Skipping {model_file.name}: no models found")
         return None
 
     chain_ids = list(dict.fromkeys(structure.chain_id))
     if not chain_ids:
-        print(f"Skipping {model_file.name}: no chains found.")
+        tqdm.write(f"  Skipping {model_file.name}: no chains found")
         return None
 
     chain_id = chain_ids[0]
@@ -281,10 +285,8 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle, \
         write_skips(skip_writer, uniprot, gene, ptm_entries, "no_afdb_directory",
                     "protein not found in AlphaFold DB (no download directory)")
 
-    for uniprot_dir in sorted(MODELS_ROOT.iterdir()):
-        if not uniprot_dir.is_dir():
-            continue
-
+    uniprot_dirs = [d for d in sorted(MODELS_ROOT.iterdir()) if d.is_dir()]
+    for uniprot_dir in tqdm(uniprot_dirs, desc="Scanning structures"):
         uniprot = uniprot_dir.name
         if args.uniprot and uniprot != args.uniprot:
             continue
@@ -300,7 +302,7 @@ with OUTPUT_PATH.open("w", encoding="utf-16", newline="") as handle, \
         if model_file is None:
             write_skips(skip_writer, uniprot, gene, ptm_entries, "no_canonical_cif",
                         "AFDB has only isoform models, no canonical sequence model")
-            print(f"Skipping {uniprot}: no canonical CIF file found.")
+            tqdm.write(f"  {uniprot}: no canonical CIF file found")
             continue
 
         chain = load_first_chain(model_file)

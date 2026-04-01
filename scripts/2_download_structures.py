@@ -9,6 +9,7 @@ from typing import Optional, Tuple, Dict, Any, List
 
 import pandas as pd
 import requests
+from tqdm import tqdm
 
 AF_PRED_ENDPOINT = "https://alphafold.ebi.ac.uk/api/prediction/{}"
 ACC_RE = re.compile(r"^(?:[A-NR-Z0-9][A-Z0-9]{5}|[OPQ][0-9][A-Z0-9]{3}[0-9])(?:-\d+)?$")
@@ -124,7 +125,7 @@ def main(in_path: str, id_column: str, out_dir: str, prefer: str, also_pae: bool
 
     with requests.Session() as s:
         s.headers.update({"User-Agent": "bulk-afdb-downloader/1.0"})
-        for i, acc in enumerate(accs, 1):
+        for acc in tqdm(accs, desc="Downloading AlphaFold structures"):
             row = {"UniProt": acc, "status": "", "structure_file": "", "pae_file": "", "note": ""}
             try:
                 meta = fetch_prediction(acc, s)
@@ -132,7 +133,7 @@ def main(in_path: str, id_column: str, out_dir: str, prefer: str, also_pae: bool
                     row["status"] = "NO_ENTRY"
                     row["note"] = "No AlphaFold DB record (404)"
                     report_rows.append(row)
-                    print(f"[{i}/{len(accs)}] {acc}: no entry")
+                    tqdm.write(f"  {acc}: no AlphaFold DB entry (404)")
                     continue
 
                 records = meta if isinstance(meta, list) else [meta]
@@ -143,7 +144,7 @@ def main(in_path: str, id_column: str, out_dir: str, prefer: str, also_pae: bool
                     row["status"] = "NO_CANONICAL_MODEL"
                     row["note"] = f"No canonical AFDB model; {len(records)} isoform-only record(s)"
                     report_rows.append(row)
-                    print(f"[{i}/{len(accs)}] {acc}: no canonical model (isoforms only)")
+                    tqdm.write(f"  {acc}: no canonical model (isoforms only)")
                     continue
                 records = canonical_records
                 downloaded = 0
@@ -169,19 +170,18 @@ def main(in_path: str, id_column: str, out_dir: str, prefer: str, also_pae: bool
                     row["status"] = "NO_STRUCTURE_URL"
                     row["note"] = f"No structure URL in any of {len(records)} record(s)"
                     report_rows.append(row)
-                    print(f"[{i}/{len(accs)}] {acc}: no structure url")
+                    tqdm.write(f"  {acc}: no structure URL found")
                     continue
 
                 row["status"] = "DOWNLOADED"
                 row["note"] = struct_name
                 report_rows.append(row)
-                print(f"[{i}/{len(accs)}] {acc}: ok -> {struct_name}")
 
             except Exception as e:
                 row["status"] = "ERROR"
                 row["note"] = str(e)
                 report_rows.append(row)
-                print(f"[{i}/{len(accs)}] {acc}: ERROR {e}")
+                tqdm.write(f"  {acc}: ERROR — {e}")
 
     rep = pd.DataFrame(report_rows)
     rep_path = logs_dir / "download_report.tsv"
