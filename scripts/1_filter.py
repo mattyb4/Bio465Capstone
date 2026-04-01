@@ -2,6 +2,7 @@ import re
 import requests
 import pandas as pd
 from pathlib import Path
+from tqdm import tqdm
 
 SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
@@ -100,7 +101,8 @@ def fetch_uniprot_gene_mapping(uniprot_ids, batch_size=100):
 
     rows = []
     uniprot_release = None
-    for i in range(0, len(ids), batch_size):
+    total_batches = (len(ids) + batch_size - 1) // batch_size
+    for i in tqdm(range(0, len(ids), batch_size), desc="Fetching UniProt gene names", total=total_batches):
         batch = ids[i : i + batch_size]
         query = " OR ".join(f"accession:{uid}" for uid in batch)
         url = "https://rest.uniprot.org/uniprotkb/search"
@@ -135,9 +137,12 @@ def main():
     tcga_file = PROJECT_ROOT / "data" / "TCGA_frequent_mutations.tsv"
     output_file = PROJECT_ROOT / "data" / "steps" / "PTMD_TCGA_hotspots_by_protein.tsv"
 
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
     # -----------------------
     # Load files
     # -----------------------
+    print("Loading PTMD and TCGA files...")
     ptmd = pd.read_csv(ptmd_file, sep="\t", low_memory=False)
     tcga = pd.read_csv(tcga_file, sep="\t")
 
@@ -153,6 +158,7 @@ def main():
     # Map UniProt -> gene via UniProt REST API
     # -----------------------
     uniprot_ids = ptmd["UniProt"].dropna().unique().tolist()
+    print(f"Mapping {len(uniprot_ids)} UniProt IDs to gene names via UniProt API...")
     idmap = fetch_uniprot_gene_mapping(uniprot_ids)
 
     ptmd = ptmd.merge(idmap, on="UniProt", how="left")
@@ -190,6 +196,7 @@ def main():
     tcga["mutation"] = tcga["aa_change"]
     tcga["mutation_with_count"] = tcga.apply(format_mutation_with_count, axis=1)
 
+    print("Filtering TCGA mutations and aggregating by gene...")
     # -----------------------
     # Aggregate PTMs by gene
     # -----------------------
@@ -233,6 +240,7 @@ def main():
     # -----------------------
     # Save result
     # -----------------------
+    print("Saving output...")
     merged.to_csv(output_file, sep="\t", index=False)
 
     print("Done.")
