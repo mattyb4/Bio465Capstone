@@ -73,6 +73,37 @@ uv run scripts/makeFigure3.py
 
 Output figures are saved to the **`Output/`** directory as `.png` files.
 
+---
+## Interpereting the Data
+
+### Output Database
+The main output of this pipeline is ptm_mutation_proximity_db.tsv, found in the Output folder. This tsv file has the following columns:  
+
+**UniProt** - the UniProt ID  
+**gene** - the gene the protein is associated with  
+**ptm_site** - position within protein sequence where PTM is  
+**ptm_type** - the type of PTM  
+**mutations_within_5_positions** - list of all mutation hotspots within 5 residues of PTM site. The formatting is initial amino acid, location, AA it mutates to - distance from PTM site. Then the PAE score* is in parentheses.  
+**mutation_count_within_5_positions** - sum of total mutation hotspots in previous column  
+**unique_mutation_position_count_within_5_positions** - sum of mutations in unique positions from mutations_within_5_positions  
+**mutations_more_than_5_positions** - list of all mutation hotsposts further than 5 residues of PTM site  
+**mutation_count_more_than_5_positions** - sum of total mutation hostspots in previous column  
+**unique_mutation_position_count_more_than_5_positions** - sum of mutations in unique positions from mutations_more_than_5_positions  
+**morethan5_linear_distance** - list of distances on linear amino acid sequence for all mutation hotspots in mutations_more_than_5_positions. This allows for easily seeing entries with mutations that are far on the linear sequence but fold close to PTM site in 3D space  
+**mutation_at_ptm_site** - indicates if the PTM site itself is a mutation hotspot  
+**ptm_diseases** - lists diseases PTM is associated with according to PTMD 2.0  
+**LTP_score** - gives LTP score of that PTM manually retrieved from PhosphoSite  
+**HTP_score** - gives HTP score of that PTM manually retrieved from PhosphoSite  
+
+
+
+*Predicted Alignment Error (PAE) score is how confident AlphaFold is that those residues are at that position. Lower score = higher confidence
+
+## Error logging
+The pipeline also generates logs found in Output/logs to record any issues where the pipeline was unable to download a file for a certain protein from AlphaFold or unable to run calculations for a PTM and why. For more information, see skipped_ptm_summary.md in Output/logs 
+
+## 
+
 
 ---
 
