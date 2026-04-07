@@ -107,3 +107,5 @@ export PATH="$HOME/.local/bin:$PATH"
 **Input data files** (`PTMD_disease_associated_ptms.tsv`, `TCGA_frequent_mutations.tsv`) are static files downloaded from PTMD and TCGA.
 
 **`ptm_diseases` is pan-cancer:** The `ptm_diseases` column in the output reflects which diseases the PTM site is associated with in PTMD. The nearby TCGA mutations are pan-cancer and were not filtered by cancer type, so a nearby mutation appearing in the output does not imply it co-occurs in the same cancer type as the PTM disease association.
+
+**404 / Isoforms Only:** Proteins without available AlphaFold structures or lacking canonical models were excluded from structural analysis.
