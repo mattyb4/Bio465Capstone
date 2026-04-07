@@ -16,3 +16,4 @@ PTMD_TCGA_hotspots_by_protein.tsv
 ptm_mutation_proximity_db.tsv
 download_errors.tsv
 ptm_skipped.tsv
+*.png
