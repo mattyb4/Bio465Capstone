@@ -36,10 +36,37 @@ git clone https://github.com/mattyb4/Bio465Capstone.git
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/) (handles Python and all dependencies automatically):
 
+**macOS/Linux:**
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
+**Windows (PowerShell):**
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+### Troubleshooting: `uv: command not found`
+
+**macOS/Linux:** After installing, your shell session needs to reload its PATH. Run:
+
+```bash
+source "$HOME/.local/bin/env"
+```
+
+Then open a new terminal and `uv` should work. If you use conda, ensure `~/.local/bin` is on your PATH by adding this to your shell profile (e.g. `~/.zshrc` or `~/.bash_profile`) and restarting your terminal:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+**Windows:** After installing, close and reopen PowerShell. If `uv` is still not found, add it to your PATH manually:
+1. Search for **"Edit the system environment variables"** in the Start menu.
+2. Under **User variables**, select `Path` and click **Edit**.
+3. Add `%USERPROFILE%\.local\bin`.
+4. Click OK and reopen your terminal.
+
+---
 ### Run the pipeline (Steps 1–4)
 
 ```bash
