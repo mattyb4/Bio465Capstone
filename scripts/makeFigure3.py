@@ -2,6 +2,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import re
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).parent
+PROJECT_ROOT = SCRIPT_DIR.parent
 
 
 def extract_ptm_position(ptm_site: str) -> int:
@@ -389,7 +393,7 @@ def plot_two_panel_ptm_figure(
 # ----------------------------
 # Example usage
 # ----------------------------
-df = pd.read_csv(r"/Users/alissaallen/gitScratch/Scratch/ptm_mutation_proximity_db.csv.csv")
+df = pd.read_csv(PROJECT_ROOT / "Output" / "ptm_mutation_proximity_db.tsv", sep="\t", encoding="utf-16")
 
 gene_of_interest = "PTPN11"
 ptm_of_interest  = "Y62"
