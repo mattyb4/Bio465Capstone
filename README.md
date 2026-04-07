@@ -20,8 +20,6 @@ The PTM disrupting data shows all mutations which disrupt a PTM across the genom
 
 HTP/LTP scores (**htp_ltp_scores.tsv**) were downloaded from [PhosphoSitePlus](https://www.phosphosite.org/). These scores indicate whether a PTM site has been detected by high-throughput (HTP) or low-throughput (LTP) methods, and are used in Step 4 to annotate the final output. This file is also located in the `data/` directory.
 
-UniProt gene ID mapping is fetched live from the UniProt REST API during Step 1 (no manual download needed).
-
 Feel free to download these data files directly from this GitHub in the `data/` directory to begin.
 
 ## Reproducing the Analysis
