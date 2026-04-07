@@ -29,7 +29,7 @@ Feel free to download these data files directly from this GitHub in the `data/` 
 First, clone this repository to your local machine and navigate into the project directory:
 
 ```bash
-git clone <https://github.com/mattyb4/Bio465Capstone.git>
+git clone https://github.com/mattyb4/Bio465Capstone.git
 ```
 
 ### Requirements
