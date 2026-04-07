@@ -24,6 +24,15 @@ Feel free to download these data files directly from this GitHub in the `data/` 
 
 ## Reproducing the Analysis
 
+### Clone the Repository
+
+First, clone this repository to your local machine and navigate into the project directory:
+
+```bash
+git clone <your-repo-url>
+cd <your-repo-name>
+```
+
 ### Requirements
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/) (handles Python and all dependencies automatically):
