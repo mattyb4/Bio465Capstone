@@ -18,7 +18,7 @@ The TCGA data shows the most frequent mutations across all cancer types. This da
 
 The PTM disrupting data shows PTMs across the genome associated with disease. This data is called **PTMD_disease_associated_ptms.tsv** and is located in the `data/` directory of this repository.
 
-HTP/LTP scores (**htp_ltp_scores.tsv**) were downloaded from [PhosphoSitePlus](https://www.phosphosite.org/). These scores indicate whether a PTM site has been detected by high-throughput (HTP) or low-throughput (LTP) methods, and are used in Step 4 to annotate the final output. This file is also located in the `data/` directory.
+HTP/LTP scores (**htp_ltp_scores.tsv**) were gathered from [PhosphoSitePlus](https://www.phosphosite.org/). These scores indicate whether a PTM site has been detected by high-throughput (HTP) or low-throughput (LTP) methods, and are used in Step 4 to annotate the final output. This file is also located in the `data/` directory.
 
 Feel free to download these data files directly from this GitHub in the `data/` directory to begin.
 
