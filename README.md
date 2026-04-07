@@ -30,6 +30,7 @@ First, clone this repository to your local machine and navigate into the project
 
 ```bash
 git clone https://github.com/mattyb4/Bio465Capstone.git
+cd Bio465Capstone
 ```
 
 ### Requirements
