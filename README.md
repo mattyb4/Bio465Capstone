@@ -47,6 +47,35 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
+---
+### Run the pipeline (Steps 1–4)
+
+```bash
+uv run main.py
+```
+
+*If you get the error "uv: command not found", see troubleshooting steps below.
+
+This runs all four steps in sequence:
+
+1. **Filter** — merges and filters the PTMD and TCGA datasets
+2. **Download structures** — fetches AlphaFold CIF models and PAE files for each protein
+3. **Find nearby mutations** — computes 3D distances between PTM sites and nearby cancer mutations
+4. **Merge HTP/LTP scores** — annotates the output with PhosphoSitePlus confidence scores
+
+The main output is **`Output/ptm_mutation_proximity_db.tsv`** — a table of PTM sites, their nearby TCGA mutations, 3D distances, and HTP/LTP annotations.
+
+### Generate Figure 3
+
+```bash
+uv run scripts/makeFigure3.py
+```
+
+Output figures are saved to the **`Output/`** directory as `.png` files.
+
+
+---
+
 ### Troubleshooting: `uv: command not found`
 
 **macOS/Linux:** After installing, your shell session needs to reload its PATH. Run:
@@ -66,30 +95,6 @@ export PATH="$HOME/.local/bin:$PATH"
 2. Under **User variables**, select `Path` and click **Edit**.
 3. Add `%USERPROFILE%\.local\bin`.
 4. Click OK and reopen your terminal.
-
----
-### Run the pipeline (Steps 1–4)
-
-```bash
-uv run main.py
-```
-
-This runs all four steps in sequence:
-
-1. **Filter** — merges and filters the PTMD and TCGA datasets
-2. **Download structures** — fetches AlphaFold CIF models and PAE files for each protein
-3. **Find nearby mutations** — computes 3D distances between PTM sites and nearby cancer mutations
-4. **Merge HTP/LTP scores** — annotates the output with PhosphoSitePlus confidence scores
-
-The main output is **`Output/ptm_mutation_proximity_db.tsv`** — a table of PTM sites, their nearby TCGA mutations, 3D distances, and HTP/LTP annotations.
-
-### Generate Figure 3
-
-```bash
-uv run scripts/makeFigure3.py
-```
-
-Output figures are saved to the **`Output/`** directory as `.png` files.
 
 ---
 
