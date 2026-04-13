@@ -102,7 +102,32 @@ The main output of this pipeline is ptm_mutation_proximity_db.tsv, found in the 
 ## Error logging
 The pipeline also generates logs found in Output/logs to record any issues where the pipeline was unable to download a file for a certain protein from AlphaFold or unable to run calculations for a PTM and why. For more information, see skipped_ptm_summary.md in Output/logs 
 
-## 
+## Analyzing Individual .cif Models
+
+If you would like to manually generate the .cif for a skipped protein from AlphaFold and run analysis on it, create a folder in cif_models that is named the exact Uniprot ID for the protein, then put your .cif file in it. Run the following command:
+
+```bash
+uv run scripts/analyze_single_cif_nearby_mutations.py <uniprotID goes here>/<.cif file name goes here>
+```
+Example:
+```bash
+uv run scripts/analyze_single_cif_nearby_mutations.py P35222/AF-P35222-F1-model_v6.cif
+```
+
+By default it prints nearby mutations to the terminal. To also append this new data to the proximity database, add --append-to-db to the end like this:
+
+```bash
+uv run scripts/analyze_single_cif_nearby_mutations.py P35222/AF-P35222-F1-model_v6.cif --append-to-db
+```
+If you would like to output it to a new tsv file instead, run it like this:
+
+```bash
+uv run scripts/analyze_single_cif_nearby_mutations.py P35222/AF-P35222-F1-model_v6.cif --append-to-db --output-db Output/outputfilename.tsv
+```
+
+Keep in mind that this will still be running analyses based on the input data from PTMD_TCGA_hotspots_by_protein.tsv generated during the pipeline.
+
+
 
 
 ---
