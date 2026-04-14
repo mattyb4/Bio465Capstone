@@ -6,6 +6,7 @@ from tqdm import tqdm
 
 SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
+HOTSPOT_MIN_AFFECTED_CASES = 3
 
 
 def clean_str_list(values):
@@ -189,8 +190,8 @@ def main():
     tcga["affected_cases"] = pd.to_numeric(tcga[case_count_col], errors="coerce")
     tcga = tcga[tcga["affected_cases"].notna()].copy()
 
-    # Keep only hotspot mutations with affected cases >= 3
-    tcga = tcga[tcga["affected_cases"] >= 3].copy()
+    # Keep only hotspot mutations above the configured recurrence threshold.
+    tcga = tcga[tcga["affected_cases"] >= HOTSPOT_MIN_AFFECTED_CASES].copy()
 
     # Keep only needed mutation label
     tcga["mutation"] = tcga["aa_change"]
@@ -245,6 +246,7 @@ def main():
 
     print("Done.")
     print(f"Using case count column: {case_count_col}")
+    print(f"Hotspot minimum affected cases: {HOTSPOT_MIN_AFFECTED_CASES}")
     print(f"PTMD disruption genes: {ptmd['gene'].nunique()}")
     print(f"TCGA hotspot genes: {tcga['gene'].nunique()}")
     print(f"Final merged proteins: {len(merged)}")
